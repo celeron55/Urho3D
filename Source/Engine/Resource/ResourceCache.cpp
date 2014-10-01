@@ -75,7 +75,7 @@ ResourceCache::ResourceCache(Context* context) :
     
     // Create resource background loader. Its thread will start on the first background request
     backgroundLoader_ = new BackgroundLoader(this);
-    
+	
     // Subscribe BeginFrame for handling directory watchers and background loaded resource finalization
     SubscribeToEvent(E_BEGINFRAME, HANDLER(ResourceCache, HandleBeginFrame));
 }
@@ -376,6 +376,44 @@ bool ResourceCache::ReloadResource(Resource* resource)
     // attempt loading again
     resource->SendEvent(E_RELOADFAILED);
     return false;
+}
+
+void ResourceCache::ReloadResourceWithDependencies(const String &fileName)
+{
+    StringHash fileNameHash(fileName);
+    // If the filename is a resource we keep track of, reload it
+    const SharedPtr<Resource>& resource = FindResource(fileNameHash);
+    if (resource)
+    {
+        LOGDEBUG("Reloading changed resource " + fileName);
+        ReloadResource(resource);
+    }
+    // Always perform dependency resource check for resource loaded from XML file as it could be used in inheritance
+    if (!resource || GetExtension(resource->GetName()) == ".xml")
+    {
+        // Check if this is a dependency resource, reload dependents
+        HashMap<StringHash, HashSet<StringHash> >::ConstIterator j = dependentResources_.Find(fileNameHash);
+        if (j != dependentResources_.End())
+        {
+            // Reloading a resource may modify the dependency tracking structure. Therefore collect the
+            // resources we need to reload first
+            Vector<SharedPtr<Resource> > dependents;
+            dependents.Reserve(j->second_.Size());
+            
+            for (HashSet<StringHash>::ConstIterator k = j->second_.Begin(); k != j->second_.End(); ++k)
+            {
+                const SharedPtr<Resource>& dependent = FindResource(*k);
+                if (dependent)
+                    dependents.Push(dependent);
+            }
+            
+            for (unsigned k = 0; k < dependents.Size(); ++k)
+            {
+                LOGDEBUG("Reloading resource " + dependents[k]->GetName() + " depending on " + fileName);
+                ReloadResource(dependents[k]);
+            }
+        }
+    }
 }
 
 void ResourceCache::SetMemoryBudget(StringHash type, unsigned budget)
@@ -906,40 +944,8 @@ void ResourceCache::HandleBeginFrame(StringHash eventType, VariantMap& eventData
         String fileName;
         while (fileWatchers_[i]->GetNextChange(fileName))
         {
-            StringHash fileNameHash(fileName);
             // If the filename is a resource we keep track of, reload it
-            const SharedPtr<Resource>& resource = FindResource(fileNameHash);
-            if (resource)
-            {
-                LOGDEBUG("Reloading changed resource " + fileName);
-                ReloadResource(resource);
-            }
-            // Always perform dependency resource check for resource loaded from XML file as it could be used in inheritance
-            if (!resource || GetExtension(resource->GetName()) == ".xml")
-            {
-                // Check if this is a dependency resource, reload dependents
-                HashMap<StringHash, HashSet<StringHash> >::ConstIterator j = dependentResources_.Find(fileNameHash);
-                if (j != dependentResources_.End())
-                {
-                    // Reloading a resource may modify the dependency tracking structure. Therefore collect the
-                    // resources we need to reload first
-                    Vector<SharedPtr<Resource> > dependents;
-                    dependents.Reserve(j->second_.Size());
-                    
-                    for (HashSet<StringHash>::ConstIterator k = j->second_.Begin(); k != j->second_.End(); ++k)
-                    {
-                        const SharedPtr<Resource>& dependent = FindResource(*k);
-                        if (dependent)
-                            dependents.Push(dependent);
-                    }
-                    
-                    for (unsigned k = 0; k < dependents.Size(); ++k)
-                    {
-                        LOGDEBUG("Reloading resource " + dependents[k]->GetName() + " depending on " + fileName);
-                        ReloadResource(dependents[k]);
-                    }
-                }
-            }
+            ReloadResourceWithDependencies(fileName);
 
             // Finally send a general file changed event even if the file was not a tracked resource
             using namespace FileChanged;
