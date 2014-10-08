@@ -378,7 +378,7 @@ bool ResourceCache::ReloadResource(Resource* resource)
     return false;
 }
 
-void ResourceCache::ReloadResourceWithDependencies(const String &fileName)
+void ResourceCache::ReloadResourceWithDependencies(const String& fileName)
 {
     StringHash fileNameHash(fileName);
     // If the filename is a resource we keep track of, reload it
@@ -944,7 +944,6 @@ void ResourceCache::HandleBeginFrame(StringHash eventType, VariantMap& eventData
         String fileName;
         while (fileWatchers_[i]->GetNextChange(fileName))
         {
-            // If the filename is a resource we keep track of, reload it
             ReloadResourceWithDependencies(fileName);
 
             // Finally send a general file changed event even if the file was not a tracked resource

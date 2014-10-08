@@ -20,25 +20,11 @@
 # THE SOFTWARE.
 #
 
-# Certain MinGW versions fail to compile SSE code. This is the initial guess for known "bad" version range, and can be tightened later
-if (MINGW AND NOT DEFINED URHO3D_SSE)
-    execute_process (COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
-    if (GCC_VERSION VERSION_LESS 4.9.1)
-        message (WARNING "Disabling SSE by default due to MinGW version. It is recommended to upgrade to MinGW with GCC >= 4.9.1. You can also try to re-enable SSE with CMake option -DURHO3D_SSE=1, but this may result in compile errors.")
-        set (URHO3D_DEFAULT_SSE FALSE)
-    else ()
-        set (URHO3D_DEFAULT_SSE TRUE)
-    endif ()
-else ()
-    set (URHO3D_DEFAULT_SSE TRUE)
-endif ()
-
 # Define all supported build options
 include (CMakeDependentOption)
 option (ANDROID "Setup build for Android platform")
 option (RASPI "Setup build for Raspberry Pi platform")
 option (IOS "Setup build for iOS platform")
-set (URHO3D_DEFAULT_64BIT FALSE)
 if (NOT MSVC)
     # On non-MSVC compiler, default to build 64-bit when the host system has a 64-bit build environment
     execute_process (COMMAND echo COMMAND ${CMAKE_C_COMPILER} -E -dM - OUTPUT_VARIABLE PREDEFINED_MACROS ERROR_QUIET)
@@ -52,7 +38,19 @@ option (URHO3D_ANGELSCRIPT "Enable AngelScript scripting support" TRUE)
 option (URHO3D_LUA "Enable additional Lua scripting support")
 option (URHO3D_LUAJIT "Enable Lua scripting support using LuaJIT (check LuaJIT's CMakeLists.txt for more options)")
 option (URHO3D_NAVIGATION "Enable navigation support" TRUE)
+option (URHO3D_NETWORK "Enable networking support" TRUE)
 option (URHO3D_PHYSICS "Enable physics support" TRUE)
+if (MINGW AND NOT DEFINED URHO3D_SSE)
+    # Certain MinGW versions fail to compile SSE code. This is the initial guess for known "bad" version range, and can be tightened later
+    execute_process (COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION ERROR_QUIET)
+    if (GCC_VERSION VERSION_LESS 4.9.1)
+        message (WARNING "Disabling SSE by default due to MinGW version. It is recommended to upgrade to MinGW with GCC >= 4.9.1. You can also try to re-enable SSE with CMake option -DURHO3D_SSE=1, but this may result in compile errors.")
+    else ()
+        set (URHO3D_DEFAULT_SSE TRUE)
+    endif ()
+else ()
+    set (URHO3D_DEFAULT_SSE TRUE)
+endif ()
 option (URHO3D_SSE "Enable SSE instruction set" ${URHO3D_DEFAULT_SSE})
 if (CMAKE_PROJECT_NAME STREQUAL Urho3D)
     cmake_dependent_option (URHO3D_LUAJIT_AMALG "Enable LuaJIT amalgamated build (LuaJIT only)" FALSE "URHO3D_LUAJIT" FALSE)
@@ -194,6 +192,11 @@ if (URHO3D_NAVIGATION)
     add_definitions (-DURHO3D_NAVIGATION)
 endif ()
 
+# Add definition for Network
+if (URHO3D_NETWORK)
+    add_definitions (-DURHO3D_NETWORK)
+endif ()
+
 # Add definition for Physics
 if (URHO3D_PHYSICS)
     add_definitions (-DURHO3D_PHYSICS)
@@ -277,12 +280,6 @@ else ()
         if (URHO3D_64BIT)
             # TODO: Revisit this again when ARM also support 64bit
             # For now just reference it to suppress "unused variable" warning
-        endif ()
-    elseif (IOS)
-        # When performing CI build, suppress all the warnings for iOS build because 3rd party libraries produce too many of them and yet we don't want to touch the 3rd party library's source codes unnecessarily
-        if ($ENV{CI})
-            set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
-            set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
         endif ()
     else ()
         if (RASPI)
