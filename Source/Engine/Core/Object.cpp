@@ -224,13 +224,11 @@ void Object::SendEvent(StringHash eventType)
 
 void Object::SendEvent(StringHash eventType, VariantMap& eventData)
 {
-#ifdef URHO3D_ENFORCE_SINGLE_THREAD
     if (!Thread::IsMainThread())
     {
         LOGERROR("Sending events is only supported from the main thread");
         return;
     }
-#endif
     
     // Make a weak pointer to self to check for destruction during event handling
     WeakPtr<Object> self(this);
