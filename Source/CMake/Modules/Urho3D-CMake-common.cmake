@@ -89,6 +89,7 @@ if (ANDROID)
 else ()
     unset (ANDROID_ABI CACHE)
 endif ()
+option (URHO3D_ENFORCE_SINGLE_THREAD "Enable checking whether Urho3D is always called from the same thread (if you make use of disabling this, make damn sure you have proper locking mechanisms in place, and you cannot use Urho3D's built-in main loop.)" TRUE)
 
 # Set the build type if not explicitly set, for single-configuration generator only
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -108,6 +109,11 @@ endif ()
 if (URHO3D_TESTING)
     enable_testing ()
     add_definitions (-DURHO3D_TESTING)
+endif ()
+
+# Enable checking whether Urho3D is always called from the same thread
+if (URHO3D_ENFORCE_SINGLE_THREAD)
+	add_definitions (-DURHO3D_ENFORCE_SINGLE_THREAD)
 endif ()
 
 # Enable SSE instruction set. Requires Pentium III or Athlon XP processor at minimum.
